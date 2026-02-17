@@ -303,22 +303,56 @@ button:active {
 
 .curve {
   margin-top: 1rem;
-  height: 180px;
+  height: 200px;
   border-radius: 14px;
-  background: rgba(2, 11, 19, 0.7);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(58, 194, 247, 0.2), transparent 45%),
+    radial-gradient(circle at 90% 20%, rgba(120, 245, 210, 0.17), transparent 35%),
+    rgba(2, 11, 19, 0.78);
   border: 1px solid rgba(150, 221, 252, 0.2);
-  display: flex;
-  align-items: flex-end;
-  gap: 0.35rem;
-  padding: 0.7rem;
+  position: relative;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
-.curve-bar {
-  flex: 1;
-  border-radius: 999px 999px 4px 4px;
-  background: linear-gradient(to top, var(--wave-b), var(--wave-a));
-  min-height: 8px;
-  animation: rise 480ms ease both;
+.wave-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wave-area {
+  opacity: 0;
+  animation: waveFillIn 800ms ease forwards;
+}
+
+.wave-line {
+  fill: none;
+  stroke: #8ef4ff;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 9px rgba(77, 226, 255, 0.45));
+  stroke-dasharray: 1800;
+  stroke-dashoffset: 1800;
+  animation: drawWave 1s ease forwards;
+}
+
+.wave-point {
+  stroke-width: 2;
+  opacity: 0;
+  transform-origin: center;
+  animation: popIn 460ms ease forwards;
+}
+
+.wave-point.high {
+  fill: #ffca8f;
+  stroke: #8e5b1a;
+}
+
+.wave-point.low {
+  fill: #8ff8e8;
+  stroke: #14706f;
 }
 
 .station-map {
@@ -523,6 +557,34 @@ button:active {
   to {
     transform: scaleY(1);
     opacity: 1;
+  }
+}
+
+@keyframes drawWave {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes waveFillIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
