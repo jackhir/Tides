@@ -469,7 +469,7 @@ function renderTimeline(events) {
   });
 }
 
-function createSmoothPath(points) {
+function createSmoothPath(points, tension = 1) {
   if (!points.length) {
     return "";
   }
@@ -484,17 +484,19 @@ function createSmoothPath(points) {
 
   let path = `M ${points[0].x} ${points[0].y}`;
 
-  for (let i = 1; i < points.length - 1; i += 1) {
-    const current = points[i];
-    const next = points[i + 1];
-    const endX = (current.x + next.x) / 2;
-    const endY = (current.y + next.y) / 2;
-    path += ` Q ${current.x} ${current.y} ${endX} ${endY}`;
-  }
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
 
-  const penultimate = points[points.length - 2];
-  const last = points[points.length - 1];
-  path += ` Q ${penultimate.x} ${penultimate.y} ${last.x} ${last.y}`;
+    const cp1x = p1.x + ((p2.x - p0.x) / 6) * tension;
+    const cp1y = p1.y + ((p2.y - p0.y) / 6) * tension;
+    const cp2x = p2.x - ((p3.x - p1.x) / 6) * tension;
+    const cp2y = p2.y - ((p3.y - p1.y) / 6) * tension;
+
+    path += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`;
+  }
 
   return path;
 }
@@ -520,50 +522,55 @@ function renderCurve(events) {
     tooltip.textContent = label;
 
     const curveRect = curve.getBoundingClientRect();
-    const xFromBar = target.offsetLeft + target.offsetWidth / 2;
-    const x = clientX ? clientX - curveRect.left : xFromBar;
-    const left = Math.max(18, Math.min(curve.clientWidth - 18, x));
-    const top = Math.max(14, target.offsetTop - 8);
+    const targetRect = target.getBoundingClientRect();
+    const fallbackX = targetRect.left - curveRect.left + targetRect.width / 2;
+    const fallbackY = targetRect.top - curveRect.top + targetRect.height / 2;
+    const x = typeof clientX === "number" ? clientX - curveRect.left : fallbackX;
+
+    const left = Math.max(24, Math.min(curve.clientWidth - 24, x));
+    const top = Math.max(14, fallbackY - 16);
 
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
     tooltip.classList.add("visible");
   }
 
+  const xmlns = "http://www.w3.org/2000/svg";
+  const chartWidth = 760;
+  const chartHeight = 210;
+  const paddingX = 18;
+  const paddingTop = 12;
+  const paddingBottom = 14;
+  const baseline = chartHeight - paddingBottom;
+  const centerY = chartHeight / 2;
   const heights = events.map((event) => event.height);
   const min = Math.min(...heights);
   const max = Math.max(...heights);
   const span = Math.max(max - min, 0.15);
-  const drawWidth = chartWidth - padding * 2;
-  const drawHeight = chartHeight - padding * 2;
+  const drawWidth = chartWidth - paddingX * 2;
+  const drawHeight = chartHeight - paddingTop - paddingBottom;
 
-  events.forEach((event, index) => {
-    const bar = document.createElement("div");
-    bar.className = "curve-bar";
-    bar.tabIndex = 0;
+  const points = events.map((event, index) => {
+    const ratio = events.length === 1 ? 0.5 : index / (events.length - 1);
+    const x = paddingX + ratio * drawWidth;
+    const linearY = paddingTop + ((max - event.height) / span) * drawHeight;
+    const exaggeratedY = centerY + (linearY - centerY) * 1.35;
+    const y = Math.max(paddingTop + 3, Math.min(baseline - 3, exaggeratedY));
 
-    const px = 10 + ((event.height - min) / span) * 150;
-    bar.style.height = `${Math.round(px)}px`;
-    bar.style.animationDelay = `${index * 80}ms`;
-
-    const tooltipText = `${classify(event.type)} tide • ${toLocalPretty(
-      event.datetime
-    )} • ${event.height.toFixed(2)} ft`;
-    bar.dataset.tooltip = tooltipText;
-    bar.setAttribute("aria-label", tooltipText);
-
-    bar.addEventListener("mouseenter", (hoverEvent) => showTooltip(bar, hoverEvent.clientX));
-    bar.addEventListener("mousemove", (hoverEvent) => showTooltip(bar, hoverEvent.clientX));
-    bar.addEventListener("mouseleave", hideTooltip);
-    bar.addEventListener("focus", () => showTooltip(bar));
-    bar.addEventListener("blur", hideTooltip);
-
-    curve.appendChild(bar);
+    return {
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
+      type: event.type,
+      datetime: event.datetime,
+      height: event.height
+    };
   });
 
-  const linePath = createSmoothPath(points);
+  const linePath = createSmoothPath(points, 1.05);
   const areaPath = `${linePath} L ${points[points.length - 1].x} ${baseline} L ${points[0].x} ${baseline} Z`;
-  const gradientId = `waveGradient-${Date.now()}`;
+  const curveId = `wave-${Date.now()}`;
+  const areaGradientId = `${curveId}-area`;
+  const lineGradientId = `${curveId}-line`;
 
   const svg = document.createElementNS(xmlns, "svg");
   svg.setAttribute("class", "wave-svg");
@@ -571,51 +578,113 @@ function renderCurve(events) {
   svg.setAttribute("preserveAspectRatio", "none");
 
   const defs = document.createElementNS(xmlns, "defs");
-  const gradient = document.createElementNS(xmlns, "linearGradient");
-  gradient.setAttribute("id", gradientId);
-  gradient.setAttribute("x1", "0%");
-  gradient.setAttribute("y1", "0%");
-  gradient.setAttribute("x2", "0%");
-  gradient.setAttribute("y2", "100%");
+  const areaGradient = document.createElementNS(xmlns, "linearGradient");
+  areaGradient.setAttribute("id", areaGradientId);
+  areaGradient.setAttribute("x1", "0%");
+  areaGradient.setAttribute("y1", "0%");
+  areaGradient.setAttribute("x2", "0%");
+  areaGradient.setAttribute("y2", "100%");
 
-  const topStop = document.createElementNS(xmlns, "stop");
-  topStop.setAttribute("offset", "0%");
-  topStop.setAttribute("stop-color", "#73f4e8");
-  topStop.setAttribute("stop-opacity", "0.82");
-  gradient.appendChild(topStop);
+  const areaTop = document.createElementNS(xmlns, "stop");
+  areaTop.setAttribute("offset", "0%");
+  areaTop.setAttribute("stop-color", "#8efef2");
+  areaTop.setAttribute("stop-opacity", "0.88");
+  areaGradient.appendChild(areaTop);
 
-  const bottomStop = document.createElementNS(xmlns, "stop");
-  bottomStop.setAttribute("offset", "100%");
-  bottomStop.setAttribute("stop-color", "#0d5b8e");
-  bottomStop.setAttribute("stop-opacity", "0.15");
-  gradient.appendChild(bottomStop);
+  const areaMid = document.createElementNS(xmlns, "stop");
+  areaMid.setAttribute("offset", "52%");
+  areaMid.setAttribute("stop-color", "#3ca8d9");
+  areaMid.setAttribute("stop-opacity", "0.5");
+  areaGradient.appendChild(areaMid);
 
-  defs.appendChild(gradient);
+  const areaBottom = document.createElementNS(xmlns, "stop");
+  areaBottom.setAttribute("offset", "100%");
+  areaBottom.setAttribute("stop-color", "#0c3560");
+  areaBottom.setAttribute("stop-opacity", "0.12");
+  areaGradient.appendChild(areaBottom);
+
+  const lineGradient = document.createElementNS(xmlns, "linearGradient");
+  lineGradient.setAttribute("id", lineGradientId);
+  lineGradient.setAttribute("x1", "0%");
+  lineGradient.setAttribute("y1", "0%");
+  lineGradient.setAttribute("x2", "100%");
+  lineGradient.setAttribute("y2", "0%");
+
+  const lineStart = document.createElementNS(xmlns, "stop");
+  lineStart.setAttribute("offset", "0%");
+  lineStart.setAttribute("stop-color", "#86f4ff");
+  lineGradient.appendChild(lineStart);
+
+  const lineEnd = document.createElementNS(xmlns, "stop");
+  lineEnd.setAttribute("offset", "100%");
+  lineEnd.setAttribute("stop-color", "#c7fff8");
+  lineGradient.appendChild(lineEnd);
+
+  defs.appendChild(areaGradient);
+  defs.appendChild(lineGradient);
   svg.appendChild(defs);
 
   const area = document.createElementNS(xmlns, "path");
   area.setAttribute("class", "wave-area");
   area.setAttribute("d", areaPath);
-  area.setAttribute("fill", `url(#${gradientId})`);
+  area.setAttribute("fill", `url(#${areaGradientId})`);
   svg.appendChild(area);
+
+  const sheen = document.createElementNS(xmlns, "path");
+  sheen.setAttribute("class", "wave-sheen");
+  sheen.setAttribute("d", createSmoothPath(points.map((point) => ({ ...point, y: point.y - 7 }))));
+  svg.appendChild(sheen);
 
   const line = document.createElementNS(xmlns, "path");
   line.setAttribute("class", "wave-line");
   line.setAttribute("d", linePath);
+  line.setAttribute("stroke", `url(#${lineGradientId})`);
   svg.appendChild(line);
+
+  points.forEach((point, index) => {
+    if (point.type !== "H") {
+      return;
+    }
+
+    const foam = document.createElementNS(xmlns, "path");
+    const foamD = `M ${point.x - 26} ${point.y + 1} Q ${point.x - 8} ${point.y - 13} ${point.x + 10} ${
+      point.y - 1
+    } Q ${point.x + 22} ${point.y + 7} ${point.x + 30} ${point.y + 3}`;
+    foam.setAttribute("class", "wave-foam");
+    foam.setAttribute("d", foamD);
+    foam.style.animationDelay = `${index * 120}ms`;
+    svg.appendChild(foam);
+  });
 
   points.forEach((point, index) => {
     const dot = document.createElementNS(xmlns, "circle");
     dot.setAttribute("class", `wave-point ${point.type === "H" ? "high" : "low"}`);
     dot.setAttribute("cx", point.x);
     dot.setAttribute("cy", point.y);
-    dot.setAttribute("r", "4.8");
+    dot.setAttribute("r", point.type === "H" ? "3.9" : "3.4");
     dot.style.animationDelay = `${index * 90}ms`;
-
-    const title = document.createElementNS(xmlns, "title");
-    title.textContent = point.label;
-    dot.appendChild(title);
     svg.appendChild(dot);
+
+    const hit = document.createElementNS(xmlns, "circle");
+    hit.setAttribute("class", "wave-hit-target");
+    hit.setAttribute("cx", point.x);
+    hit.setAttribute("cy", point.y);
+    hit.setAttribute("r", "15");
+    hit.setAttribute("tabindex", "0");
+
+    const tooltipText = `${classify(point.type)} tide • ${toLocalPretty(
+      point.datetime
+    )} • ${point.height.toFixed(2)} ft`;
+    hit.dataset.tooltip = tooltipText;
+    hit.setAttribute("aria-label", tooltipText);
+
+    hit.addEventListener("mouseenter", (hoverEvent) => showTooltip(hit, hoverEvent.clientX));
+    hit.addEventListener("mousemove", (hoverEvent) => showTooltip(hit, hoverEvent.clientX));
+    hit.addEventListener("mouseleave", hideTooltip);
+    hit.addEventListener("focus", () => showTooltip(hit));
+    hit.addEventListener("blur", hideTooltip);
+
+    svg.appendChild(hit);
   });
 
   curve.appendChild(svg);

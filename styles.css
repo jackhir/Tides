@@ -303,35 +303,90 @@ button:active {
 
 .curve {
   margin-top: 1rem;
-  height: 200px;
+  height: 220px;
   border-radius: 14px;
   background:
-    radial-gradient(circle at 20% 10%, rgba(58, 194, 247, 0.2), transparent 45%),
-    radial-gradient(circle at 90% 20%, rgba(120, 245, 210, 0.17), transparent 35%),
+    radial-gradient(circle at 20% 8%, rgba(86, 209, 255, 0.22), transparent 42%),
+    radial-gradient(circle at 85% 20%, rgba(98, 239, 211, 0.15), transparent 36%),
     rgba(2, 11, 19, 0.78);
   border: 1px solid rgba(150, 221, 252, 0.2);
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.35rem;
-  padding: 0.7rem;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
-.curve-bar {
-  flex: 1;
-  border-radius: 999px 999px 4px 4px;
-  background: linear-gradient(to top, var(--wave-b), var(--wave-a));
-  min-height: 8px;
-  animation: rise 480ms ease both;
+.wave-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wave-area {
+  opacity: 0;
+  animation: waveFillIn 700ms ease forwards, waveBob 7s ease-in-out infinite 700ms;
+}
+
+.wave-line {
+  fill: none;
+  stroke-width: 4.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 10px rgba(104, 242, 255, 0.5));
+  stroke-dasharray: 1800;
+  stroke-dashoffset: 1800;
+  animation: drawWave 1s ease forwards, waveBob 7s ease-in-out infinite 700ms;
+}
+
+.wave-sheen {
+  fill: none;
+  stroke: rgba(230, 255, 255, 0.48);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 14 16;
+  opacity: 0.85;
+  animation: sheenDrift 5.5s linear infinite;
+}
+
+.wave-foam {
+  fill: none;
+  stroke: rgba(240, 255, 255, 0.86);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(210, 255, 255, 0.35));
+  animation: foamPop 900ms ease forwards;
+}
+
+.wave-point {
+  stroke-width: 1.8;
+  opacity: 0;
+  transform-origin: center;
+  animation: popIn 420ms ease forwards;
+}
+
+.wave-point.high {
+  fill: #ffd39a;
+  stroke: rgba(95, 58, 12, 0.75);
+  filter: drop-shadow(0 0 6px rgba(255, 211, 154, 0.44));
+}
+
+.wave-point.low {
+  fill: #99fff0;
+  stroke: rgba(16, 89, 88, 0.72);
+  filter: drop-shadow(0 0 6px rgba(153, 255, 240, 0.44));
+}
+
+.wave-hit-target {
+  fill: transparent;
   cursor: pointer;
+  pointer-events: all;
   outline: none;
-  transition: transform 140ms ease, filter 140ms ease;
 }
 
-.curve-bar:hover,
-.curve-bar:focus-visible {
-  transform: translateY(-2px);
-  filter: brightness(1.08);
+.wave-hit-target:focus-visible {
+  fill: rgba(155, 241, 255, 0.18);
+  stroke: rgba(201, 251, 255, 0.92);
+  stroke-width: 1.8;
 }
 
 .curve-tooltip {
@@ -570,14 +625,48 @@ button:active {
   }
 }
 
+@keyframes waveBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
 @keyframes waveFillIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes sheenDrift {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -240;
+  }
+}
+
+@keyframes foamPop {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.9);
+  }
+  55% {
+    opacity: 0.95;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0.45;
+    transform: translateY(-1px) scale(1);
   }
 }
 
