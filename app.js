@@ -469,6 +469,36 @@ function renderTimeline(events) {
   });
 }
 
+function createSmoothPath(points) {
+  if (!points.length) {
+    return "";
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y} L ${points[0].x} ${points[0].y}`;
+  }
+
+  if (points.length === 2) {
+    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  }
+
+  let path = `M ${points[0].x} ${points[0].y}`;
+
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const current = points[i];
+    const next = points[i + 1];
+    const endX = (current.x + next.x) / 2;
+    const endY = (current.y + next.y) / 2;
+    path += ` Q ${current.x} ${current.y} ${endX} ${endY}`;
+  }
+
+  const penultimate = points[points.length - 2];
+  const last = points[points.length - 1];
+  path += ` Q ${penultimate.x} ${penultimate.y} ${last.x} ${last.y}`;
+
+  return path;
+}
+
 function renderCurve(events) {
   curve.innerHTML = "";
 
@@ -477,22 +507,89 @@ function renderCurve(events) {
     return;
   }
 
+  const xmlns = "http://www.w3.org/2000/svg";
+  const chartWidth = 760;
+  const chartHeight = 190;
+  const padding = 16;
+  const baseline = chartHeight - padding;
+
   const heights = events.map((event) => event.height);
   const min = Math.min(...heights);
   const max = Math.max(...heights);
-  const span = Math.max(max - min, 0.2);
+  const span = Math.max(max - min, 0.15);
+  const drawWidth = chartWidth - padding * 2;
+  const drawHeight = chartHeight - padding * 2;
 
-  events.forEach((event, index) => {
-    const bar = document.createElement("div");
-    bar.className = "curve-bar";
-
-    const px = 10 + ((event.height - min) / span) * 150;
-    bar.style.height = `${Math.round(px)}px`;
-    bar.style.animationDelay = `${index * 80}ms`;
-    bar.title = `${classify(event.type)} ${event.height.toFixed(2)} ft`;
-
-    curve.appendChild(bar);
+  const points = events.map((event, index) => {
+    const ratio = events.length === 1 ? 0.5 : index / (events.length - 1);
+    const x = padding + ratio * drawWidth;
+    const y = padding + ((max - event.height) / span) * drawHeight;
+    return {
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
+      type: event.type,
+      label: `${classify(event.type)} ${event.height.toFixed(2)} ft`
+    };
   });
+
+  const linePath = createSmoothPath(points);
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${baseline} L ${points[0].x} ${baseline} Z`;
+  const gradientId = `waveGradient-${Date.now()}`;
+
+  const svg = document.createElementNS(xmlns, "svg");
+  svg.setAttribute("class", "wave-svg");
+  svg.setAttribute("viewBox", `0 0 ${chartWidth} ${chartHeight}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+
+  const defs = document.createElementNS(xmlns, "defs");
+  const gradient = document.createElementNS(xmlns, "linearGradient");
+  gradient.setAttribute("id", gradientId);
+  gradient.setAttribute("x1", "0%");
+  gradient.setAttribute("y1", "0%");
+  gradient.setAttribute("x2", "0%");
+  gradient.setAttribute("y2", "100%");
+
+  const topStop = document.createElementNS(xmlns, "stop");
+  topStop.setAttribute("offset", "0%");
+  topStop.setAttribute("stop-color", "#73f4e8");
+  topStop.setAttribute("stop-opacity", "0.82");
+  gradient.appendChild(topStop);
+
+  const bottomStop = document.createElementNS(xmlns, "stop");
+  bottomStop.setAttribute("offset", "100%");
+  bottomStop.setAttribute("stop-color", "#0d5b8e");
+  bottomStop.setAttribute("stop-opacity", "0.15");
+  gradient.appendChild(bottomStop);
+
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
+
+  const area = document.createElementNS(xmlns, "path");
+  area.setAttribute("class", "wave-area");
+  area.setAttribute("d", areaPath);
+  area.setAttribute("fill", `url(#${gradientId})`);
+  svg.appendChild(area);
+
+  const line = document.createElementNS(xmlns, "path");
+  line.setAttribute("class", "wave-line");
+  line.setAttribute("d", linePath);
+  svg.appendChild(line);
+
+  points.forEach((point, index) => {
+    const dot = document.createElementNS(xmlns, "circle");
+    dot.setAttribute("class", `wave-point ${point.type === "H" ? "high" : "low"}`);
+    dot.setAttribute("cx", point.x);
+    dot.setAttribute("cy", point.y);
+    dot.setAttribute("r", "4.8");
+    dot.style.animationDelay = `${index * 90}ms`;
+
+    const title = document.createElementNS(xmlns, "title");
+    title.textContent = point.label;
+    dot.appendChild(title);
+    svg.appendChild(dot);
+  });
+
+  curve.appendChild(svg);
 }
 
 function renderForecast(events, pickedDate) {
