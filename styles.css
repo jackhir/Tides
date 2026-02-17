@@ -393,7 +393,7 @@ button:active {
   position: absolute;
   left: 0;
   top: 0;
-  transform: translate(-50%, -100%);
+  transform: translate(-50%, calc(-100% - 8px));
   padding: 0.38rem 0.56rem;
   border-radius: 10px;
   border: 1px solid rgba(170, 244, 255, 0.35);
@@ -402,16 +402,42 @@ button:active {
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  white-space: nowrap;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+  max-width: min(320px, calc(100% - 20px));
   pointer-events: none;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity 120ms ease, transform 120ms ease;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   z-index: 2;
 }
 
 .curve-tooltip.visible {
   opacity: 1;
+}
+
+.curve-tooltip.below {
+  transform: translate(-50%, 8px);
+}
+
+.curve-tooltip.edge-right {
+  transform: translate(-100%, calc(-100% - 8px));
+  white-space: nowrap;
+  max-width: none;
+  text-align: left;
+}
+
+.curve-tooltip.edge-right.below {
+  transform: translate(-100%, 8px);
+}
+
+.curve-tooltip.edge-left {
+  transform: translate(0, calc(-100% - 8px));
+}
+
+.curve-tooltip.edge-left.below {
+  transform: translate(0, 8px);
 }
 
 .station-map {

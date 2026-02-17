@@ -515,6 +515,7 @@ function renderCurve(events) {
 
   function hideTooltip() {
     tooltip.classList.remove("visible");
+    tooltip.classList.remove("below");
   }
 
   function showTooltip(target, clientX) {
@@ -526,9 +527,37 @@ function renderCurve(events) {
     const fallbackX = targetRect.left - curveRect.left + targetRect.width / 2;
     const fallbackY = targetRect.top - curveRect.top + targetRect.height / 2;
     const x = typeof clientX === "number" ? clientX - curveRect.left : fallbackX;
+    const edgePadding = 10;
 
-    const left = Math.max(24, Math.min(curve.clientWidth - 24, x));
-    const top = Math.max(14, fallbackY - 16);
+    tooltip.classList.remove("below", "edge-right", "edge-left");
+    tooltip.classList.add("visible");
+
+    // Measure after text update to clamp against actual rendered size.
+    const tipWidth = tooltip.offsetWidth;
+    const tipHeight = tooltip.offsetHeight;
+    const halfWidth = tipWidth / 2;
+
+    const nearRightEdge = x + halfWidth > curve.clientWidth - edgePadding;
+    const nearLeftEdge = x - halfWidth < edgePadding;
+
+    let left = x;
+    if (nearRightEdge) {
+      left = curve.clientWidth - edgePadding;
+      tooltip.classList.add("edge-right");
+    } else if (nearLeftEdge) {
+      left = edgePadding;
+      tooltip.classList.add("edge-left");
+    }
+
+    const anchorY = fallbackY - 8;
+    const needsBelow = anchorY - tipHeight - 12 < edgePadding;
+    const top = needsBelow
+      ? Math.min(curve.clientHeight - tipHeight - edgePadding, fallbackY + 8)
+      : anchorY;
+
+    if (needsBelow) {
+      tooltip.classList.add("below");
+    }
 
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
