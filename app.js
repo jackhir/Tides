@@ -1,16 +1,25 @@
-const stations = [
-  { id: "9414290", name: "San Francisco, CA", lat: 37.806, lng: -122.465 },
-  { id: "9447130", name: "Seattle, WA", lat: 47.602, lng: -122.339 },
-  { id: "8418150", name: "Portland, ME", lat: 43.656, lng: -70.246 },
-  { id: "8443970", name: "Boston, MA", lat: 42.353, lng: -71.05 },
-  { id: "8638610", name: "Sewells Point, VA", lat: 36.946, lng: -76.33 },
-  { id: "8724580", name: "Key West, FL", lat: 24.555, lng: -81.808 },
-  { id: "8771450", name: "Galveston, TX", lat: 29.31, lng: -94.793 },
-  { id: "1612340", name: "Honolulu, HI", lat: 21.306, lng: -157.867 },
-  { id: "9461380", name: "Nikiski, AK", lat: 60.68, lng: -151.398 }
+const NOAA_STATIONS_URL =
+  "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions";
+
+const SANTA_MONICA = {
+  name: "Santa Monica, CA",
+  lat: 34.0195,
+  lng: -118.4912
+};
+
+const fallbackStations = [
+  { id: "9410840", name: "Santa Monica, CA", state: "CA", lat: 34.008, lng: -118.5 },
+  { id: "9410660", name: "Los Angeles, CA", state: "CA", lat: 33.72, lng: -118.273 },
+  { id: "9411340", name: "Port Hueneme, CA", state: "CA", lat: 34.147, lng: -119.195 },
+  { id: "9410230", name: "La Jolla, CA", state: "CA", lat: 32.867, lng: -117.257 },
+  { id: "9414290", name: "San Francisco, CA", state: "CA", lat: 37.806, lng: -122.465 }
 ];
 
 const stationSelect = document.getElementById("stationSelect");
+const stationSearch = document.getElementById("stationSearch");
+const santaMonicaBtn = document.getElementById("santaMonicaBtn");
+const stationCount = document.getElementById("stationCount");
+const santaButtons = document.getElementById("santaButtons");
 const dateInput = document.getElementById("dateInput");
 const fetchBtn = document.getElementById("fetchBtn");
 const statusEl = document.getElementById("status");
@@ -24,19 +33,103 @@ const timeline = document.getElementById("timeline");
 const curve = document.getElementById("curve");
 const forecast = document.getElementById("forecast");
 
+let stations = [];
 let stationMap = null;
 const stationMarkers = new Map();
 
-function initControls() {
-  stations.forEach((station) => {
-    const option = document.createElement("option");
-    option.value = station.id;
-    option.textContent = station.name;
-    stationSelect.appendChild(option);
-  });
-
+function initDateControl() {
   const todayUtc = new Date().toISOString().split("T")[0];
   dateInput.value = todayUtc;
+}
+
+function normalizeStation(raw) {
+  const id = String(raw?.id ?? raw?.stationId ?? "").trim();
+  const name = String(raw?.name ?? raw?.stationName ?? "").trim();
+  const lat = Number(raw?.lat ?? raw?.latitude);
+  const lng = Number(raw?.lng ?? raw?.lon ?? raw?.longitude);
+  const state = String(raw?.state ?? "").trim();
+
+  if (!id || !name || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { id, name, state, lat, lng };
+}
+
+async function loadStations() {
+  const response = await fetch(NOAA_STATIONS_URL, { mode: "cors" });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error("NOAA station metadata is unavailable right now.");
+  }
+
+  const rawList = payload?.stationList ?? payload?.stations ?? [];
+  const unique = new Map();
+
+  rawList
+    .map((entry) => normalizeStation(entry))
+    .filter(Boolean)
+    .forEach((station) => {
+      unique.set(station.id, station);
+    });
+
+  const loadedStations = [...unique.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  if (!loadedStations.length) {
+    throw new Error("No tide-prediction stations were returned by NOAA.");
+  }
+
+  return loadedStations;
+}
+
+function stationOptionLabel(station) {
+  const region = station.state ? `, ${station.state}` : "";
+  return `${station.name}${region} (${station.id})`;
+}
+
+function populateStationSelect(filterText = "") {
+  const query = filterText.trim().toLowerCase();
+  const previous = stationSelect.value;
+
+  let filtered = stations;
+  if (query) {
+    filtered = stations.filter((station) => {
+      const haystack = `${station.name} ${station.state} ${station.id}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }
+
+  stationSelect.innerHTML = "";
+
+  if (!filtered.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No stations match your search";
+    stationSelect.appendChild(option);
+    stationSelect.disabled = true;
+    return;
+  }
+
+  stationSelect.disabled = false;
+
+  const fragment = document.createDocumentFragment();
+  filtered.forEach((station) => {
+    const option = document.createElement("option");
+    option.value = station.id;
+    option.textContent = stationOptionLabel(station);
+    fragment.appendChild(option);
+  });
+
+  stationSelect.appendChild(fragment);
+
+  if (filtered.some((station) => station.id === previous)) {
+    stationSelect.value = previous;
+  }
+}
+
+function updateStationCountMessage() {
+  stationCount.textContent = `Loaded ${stations.length.toLocaleString()} NOAA tide stations.`;
 }
 
 function initMap() {
@@ -53,33 +146,48 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(stationMap);
 
-  stations.forEach((station) => {
-    const marker = L.marker([station.lat, station.lng], {
-      icon: stationPin(false)
-    }).addTo(stationMap);
+  setTimeout(() => stationMap.invalidateSize(), 120);
+}
 
-    marker.bindPopup(`<strong>${station.name}</strong><br />Station ${station.id}`);
+function markerStyle(active) {
+  return {
+    radius: active ? 7 : 4,
+    color: active ? "#ffd67f" : "#9fdfff",
+    weight: active ? 2 : 1,
+    fillColor: active ? "#ff9b7f" : "#1cb9e3",
+    fillOpacity: active ? 0.95 : 0.74
+  };
+}
+
+function renderStationMarkers() {
+  if (!stationMap) {
+    return;
+  }
+
+  stationMarkers.forEach((marker) => marker.remove());
+  stationMarkers.clear();
+
+  stations.forEach((station) => {
+    const marker = L.circleMarker([station.lat, station.lng], markerStyle(false)).addTo(stationMap);
+
+    marker.bindPopup(
+      `<strong>${escapeHtml(station.name)}</strong><br />NOAA Station ${escapeHtml(station.id)}`
+    );
 
     marker.on("click", () => {
+      if (stationSearch.value) {
+        stationSearch.value = "";
+        populateStationSelect();
+      }
+
       if (stationSelect.value !== station.id) {
         stationSelect.value = station.id;
       }
+
       stationSelect.dispatchEvent(new Event("change"));
     });
 
     stationMarkers.set(station.id, marker);
-  });
-
-  syncMapSelection(stationSelect.value, false);
-  setTimeout(() => stationMap.invalidateSize(), 120);
-}
-
-function stationPin(active) {
-  return L.divIcon({
-    html: `<span class="station-pin${active ? " active" : ""}"></span>`,
-    className: "",
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
   });
 }
 
@@ -89,7 +197,7 @@ function syncMapSelection(stationId, pan = true) {
   }
 
   stationMarkers.forEach((marker, id) => {
-    marker.setIcon(stationPin(id === stationId));
+    marker.setStyle(markerStyle(id === stationId));
   });
 
   if (!pan) {
@@ -101,9 +209,74 @@ function syncMapSelection(stationId, pan = true) {
     return;
   }
 
-  stationMap.flyTo([station.lat, station.lng], Math.max(stationMap.getZoom(), 4), {
+  stationMap.flyTo([station.lat, station.lng], Math.max(stationMap.getZoom(), 6), {
     duration: 0.6
   });
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const earthRadiusKm = 6371;
+  const toRad = (value) => (value * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function nearestStations(lat, lng, count = 8, maxKm = 160) {
+  const sorted = stations
+    .map((station) => ({
+      ...station,
+      distanceKm: haversineKm(lat, lng, station.lat, station.lng)
+    }))
+    .sort((a, b) => a.distanceKm - b.distanceKm);
+
+  const nearby = sorted.filter((station) => station.distanceKm <= maxKm).slice(0, count);
+  return nearby.length ? nearby : sorted.slice(0, count);
+}
+
+function renderSantaMonicaButtons() {
+  santaButtons.innerHTML = "";
+
+  const nearby = nearestStations(SANTA_MONICA.lat, SANTA_MONICA.lng, 9, 180);
+  nearby.forEach((station) => {
+    const button = document.createElement("button");
+    button.type = "button";
+
+    const miles = station.distanceKm * 0.621371;
+    button.textContent = `${station.name} (${miles.toFixed(1)} mi)`;
+
+    button.addEventListener("click", () => {
+      if (stationSearch.value) {
+        stationSearch.value = "";
+        populateStationSelect();
+      }
+
+      stationSelect.value = station.id;
+      stationSelect.dispatchEvent(new Event("change"));
+    });
+
+    santaButtons.appendChild(button);
+  });
+}
+
+function selectInitialStation() {
+  const santaMonicaMatch =
+    stations.find((station) => station.id === "9410840") ||
+    stations.find((station) => station.name.toLowerCase().includes("santa monica"));
+
+  const initial = santaMonicaMatch || nearestStations(SANTA_MONICA.lat, SANTA_MONICA.lng, 1)[0];
+
+  if (!initial) {
+    return;
+  }
+
+  stationSelect.value = initial.id;
+  syncMapSelection(initial.id, true);
 }
 
 function formatDateYmd(dateStr) {
@@ -158,13 +331,27 @@ function setStatus(message, variant = "") {
 }
 
 function setLoading(isLoading) {
-  fetchBtn.disabled = isLoading;
+  fetchBtn.disabled = isLoading || !stations.length;
   fetchBtn.textContent = isLoading ? "Loading..." : "Ride the Tide";
+}
+
+function escapeHtml(input) {
+  return String(input)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 async function fetchTides() {
   const stationId = stationSelect.value;
   const pickedDate = dateInput.value;
+
+  if (!stationId) {
+    setStatus("Choose a station first.", "error");
+    return;
+  }
 
   if (!pickedDate) {
     setStatus("Please choose a date.", "error");
@@ -355,13 +542,73 @@ function renderEmpty() {
   forecast.innerHTML = "";
 }
 
-fetchBtn.addEventListener("click", fetchTides);
-stationSelect.addEventListener("change", () => {
-  syncMapSelection(stationSelect.value);
-  fetchTides();
-});
-dateInput.addEventListener("change", fetchTides);
+function initEventHandlers() {
+  fetchBtn.addEventListener("click", fetchTides);
 
-initControls();
-initMap();
-fetchTides();
+  stationSelect.addEventListener("change", () => {
+    syncMapSelection(stationSelect.value);
+    fetchTides();
+  });
+
+  dateInput.addEventListener("change", fetchTides);
+
+  stationSearch.addEventListener("input", () => {
+    populateStationSelect(stationSearch.value);
+  });
+
+  stationSearch.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    if (!stationSelect.value) {
+      return;
+    }
+
+    syncMapSelection(stationSelect.value);
+    fetchTides();
+  });
+
+  santaMonicaBtn.addEventListener("click", () => {
+    const nearest = nearestStations(SANTA_MONICA.lat, SANTA_MONICA.lng, 1)[0];
+    if (!nearest) {
+      return;
+    }
+
+    if (stationSearch.value) {
+      stationSearch.value = "";
+      populateStationSelect();
+    }
+
+    stationSelect.value = nearest.id;
+    stationSelect.dispatchEvent(new Event("change"));
+    setStatus(`Centered on tide stations near ${SANTA_MONICA.name}.`, "ok");
+  });
+}
+
+async function bootstrap() {
+  initDateControl();
+  initMap();
+  initEventHandlers();
+
+  setStatus("Loading NOAA tide station locations...");
+
+  try {
+    stations = await loadStations();
+    updateStationCountMessage();
+  } catch (error) {
+    stations = fallbackStations;
+    stationCount.textContent =
+      "Using fallback stations right now (NOAA metadata feed unavailable in this browser session).";
+    setStatus(`Station catalog warning: ${error.message}`, "error");
+  }
+
+  populateStationSelect();
+  renderStationMarkers();
+  renderSantaMonicaButtons();
+  selectInitialStation();
+  fetchTides();
+}
+
+bootstrap();

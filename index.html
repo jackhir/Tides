@@ -44,7 +44,25 @@
           Date
           <input id="dateInput" type="date" />
         </label>
-        <button id="fetchBtn" type="button">Ride the Tide</button>
+        <label>
+          Find Station
+          <input
+            id="stationSearch"
+            type="search"
+            placeholder="Search by station name or NOAA ID"
+          />
+        </label>
+        <div class="control-buttons">
+          <button id="santaMonicaBtn" type="button">Santa Monica Beaches</button>
+          <button id="fetchBtn" type="button">Ride the Tide</button>
+        </div>
+        <p id="stationCount" class="small station-count">Loading NOAA stations...</p>
+      </section>
+
+      <section class="panel reveal">
+        <h2>Near Santa Monica</h2>
+        <p class="small">Fast picks for beaches and harbors in the area.</p>
+        <div id="santaButtons" class="santa-buttons"></div>
       </section>
 
       <section class="status reveal" id="status" aria-live="polite"></section>

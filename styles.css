@@ -104,7 +104,7 @@ body {
 .controls {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 1rem;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -136,6 +136,29 @@ input {
   background: rgba(2, 10, 20, 0.66);
   color: var(--text);
   border: 1px solid rgba(166, 232, 255, 0.26);
+}
+
+#stationSearch::placeholder {
+  color: rgba(184, 220, 232, 0.68);
+}
+
+.control-buttons {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.control-buttons button {
+  flex: 1;
+}
+
+#santaMonicaBtn {
+  background: linear-gradient(120deg, #ffd67f, #ff9b7f);
+}
+
+.station-count {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 button {
@@ -283,19 +306,23 @@ button:active {
   color: var(--accent) !important;
 }
 
-.station-pin {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #f4f8ff;
-  border: 3px solid #11384e;
-  box-shadow: 0 0 0 4px rgba(50, 168, 243, 0.25);
+.santa-buttons {
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
 }
 
-.station-pin.active {
-  background: var(--accent);
-  border-color: #5d3d0b;
-  box-shadow: 0 0 0 5px rgba(255, 204, 102, 0.35);
+.santa-buttons button {
+  border: 1px solid rgba(150, 221, 252, 0.35);
+  background: rgba(2, 11, 19, 0.74);
+  color: var(--text);
+  box-shadow: none;
+  text-align: left;
+}
+
+.santa-buttons button:hover {
+  transform: translateY(-1px);
 }
 
 .forecast-grid {
@@ -417,6 +444,10 @@ button:active {
   animation-delay: 510ms;
 }
 
+.reveal:nth-child(10) {
+  animation-delay: 560ms;
+}
+
 @keyframes drift {
   0%,
   100% {
@@ -454,11 +485,19 @@ button:active {
     grid-template-columns: 1fr;
   }
 
+  .control-buttons {
+    flex-direction: column;
+  }
+
   .panels {
     grid-template-columns: 1fr;
   }
 
   .forecast-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .santa-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
