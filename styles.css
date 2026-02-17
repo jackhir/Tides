@@ -104,13 +104,18 @@ body {
 .controls {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
   padding: 1rem;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 18px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
+}
+
+.controls > * {
+  min-width: 0;
 }
 
 label {
@@ -132,10 +137,17 @@ button {
 
 select,
 input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
   padding: 0.7rem 0.8rem;
   background: rgba(2, 10, 20, 0.66);
   color: var(--text);
   border: 1px solid rgba(166, 232, 255, 0.26);
+}
+
+#stationSelect {
+  text-overflow: ellipsis;
 }
 
 #stationSearch::placeholder {
@@ -150,6 +162,7 @@ input {
 
 .control-buttons button {
   flex: 1;
+  height: 44px;
 }
 
 #santaMonicaBtn {
@@ -159,6 +172,28 @@ input {
 .station-count {
   grid-column: 1 / -1;
   margin: 0;
+}
+
+.control-station {
+  grid-column: span 5;
+}
+
+.control-date {
+  grid-column: span 3;
+}
+
+.control-search {
+  grid-column: span 4;
+}
+
+.control-actions {
+  grid-column: span 8;
+}
+
+.control-meta {
+  grid-column: span 4;
+  text-align: right;
+  align-self: center;
 }
 
 button {
@@ -242,6 +277,7 @@ button:active {
   background: rgba(3, 18, 29, 0.62);
   border-radius: 12px;
   padding: 0.75rem;
+  min-height: 78px;
 }
 
 .stat-label {
@@ -256,6 +292,13 @@ button:active {
   margin: 0.3rem 0 0;
   font-weight: 700;
   font-size: 1.1rem;
+}
+
+#stationName {
+  font-size: 0.96rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .curve {
@@ -319,6 +362,9 @@ button:active {
   color: var(--text);
   box-shadow: none;
   text-align: left;
+  min-height: 54px;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .santa-buttons button:hover {
@@ -485,8 +531,20 @@ button:active {
     grid-template-columns: 1fr;
   }
 
+  .control-station,
+  .control-date,
+  .control-search,
+  .control-actions,
+  .control-meta {
+    grid-column: 1 / -1;
+  }
+
   .control-buttons {
     flex-direction: column;
+  }
+
+  .control-meta {
+    text-align: left;
   }
 
   .panels {
@@ -499,5 +557,19 @@ button:active {
 
   .santa-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1080px) {
+  .control-station,
+  .control-date,
+  .control-search,
+  .control-actions,
+  .control-meta {
+    grid-column: 1 / -1;
+  }
+
+  .control-meta {
+    text-align: left;
   }
 }

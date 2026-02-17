@@ -36,15 +36,15 @@
       </header>
 
       <section class="controls reveal" aria-label="Tide controls">
-        <label>
+        <label class="control-field control-station">
           Station
           <select id="stationSelect"></select>
         </label>
-        <label>
+        <label class="control-field control-date">
           Date
           <input id="dateInput" type="date" />
         </label>
-        <label>
+        <label class="control-field control-search">
           Find Station
           <input
             id="stationSearch"
@@ -52,11 +52,11 @@
             placeholder="Search by station name or NOAA ID"
           />
         </label>
-        <div class="control-buttons">
+        <div class="control-buttons control-actions">
           <button id="santaMonicaBtn" type="button">Santa Monica Beaches</button>
           <button id="fetchBtn" type="button">Ride the Tide</button>
         </div>
-        <p id="stationCount" class="small station-count">Loading NOAA stations...</p>
+        <p id="stationCount" class="small station-count control-meta">Loading NOAA stations...</p>
       </section>
 
       <section class="panel reveal">
