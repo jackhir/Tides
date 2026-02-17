@@ -507,11 +507,28 @@ function renderCurve(events) {
     return;
   }
 
-  const xmlns = "http://www.w3.org/2000/svg";
-  const chartWidth = 760;
-  const chartHeight = 190;
-  const padding = 16;
-  const baseline = chartHeight - padding;
+  const tooltip = document.createElement("div");
+  tooltip.className = "curve-tooltip";
+  curve.appendChild(tooltip);
+
+  function hideTooltip() {
+    tooltip.classList.remove("visible");
+  }
+
+  function showTooltip(target, clientX) {
+    const label = target.dataset.tooltip || "";
+    tooltip.textContent = label;
+
+    const curveRect = curve.getBoundingClientRect();
+    const xFromBar = target.offsetLeft + target.offsetWidth / 2;
+    const x = clientX ? clientX - curveRect.left : xFromBar;
+    const left = Math.max(18, Math.min(curve.clientWidth - 18, x));
+    const top = Math.max(14, target.offsetTop - 8);
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.classList.add("visible");
+  }
 
   const heights = events.map((event) => event.height);
   const min = Math.min(...heights);
@@ -520,16 +537,28 @@ function renderCurve(events) {
   const drawWidth = chartWidth - padding * 2;
   const drawHeight = chartHeight - padding * 2;
 
-  const points = events.map((event, index) => {
-    const ratio = events.length === 1 ? 0.5 : index / (events.length - 1);
-    const x = padding + ratio * drawWidth;
-    const y = padding + ((max - event.height) / span) * drawHeight;
-    return {
-      x: Number(x.toFixed(2)),
-      y: Number(y.toFixed(2)),
-      type: event.type,
-      label: `${classify(event.type)} ${event.height.toFixed(2)} ft`
-    };
+  events.forEach((event, index) => {
+    const bar = document.createElement("div");
+    bar.className = "curve-bar";
+    bar.tabIndex = 0;
+
+    const px = 10 + ((event.height - min) / span) * 150;
+    bar.style.height = `${Math.round(px)}px`;
+    bar.style.animationDelay = `${index * 80}ms`;
+
+    const tooltipText = `${classify(event.type)} tide • ${toLocalPretty(
+      event.datetime
+    )} • ${event.height.toFixed(2)} ft`;
+    bar.dataset.tooltip = tooltipText;
+    bar.setAttribute("aria-label", tooltipText);
+
+    bar.addEventListener("mouseenter", (hoverEvent) => showTooltip(bar, hoverEvent.clientX));
+    bar.addEventListener("mousemove", (hoverEvent) => showTooltip(bar, hoverEvent.clientX));
+    bar.addEventListener("mouseleave", hideTooltip);
+    bar.addEventListener("focus", () => showTooltip(bar));
+    bar.addEventListener("blur", hideTooltip);
+
+    curve.appendChild(bar);
   });
 
   const linePath = createSmoothPath(points);

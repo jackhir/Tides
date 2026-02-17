@@ -311,48 +311,52 @@ button:active {
     rgba(2, 11, 19, 0.78);
   border: 1px solid rgba(150, 221, 252, 0.2);
   position: relative;
-  overflow: hidden;
-  padding: 0.5rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  padding: 0.7rem;
 }
 
-.wave-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
+.curve-bar {
+  flex: 1;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(to top, var(--wave-b), var(--wave-a));
+  min-height: 8px;
+  animation: rise 480ms ease both;
+  cursor: pointer;
+  outline: none;
+  transition: transform 140ms ease, filter 140ms ease;
 }
 
-.wave-area {
+.curve-bar:hover,
+.curve-bar:focus-visible {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.curve-tooltip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -100%);
+  padding: 0.38rem 0.56rem;
+  border-radius: 10px;
+  border: 1px solid rgba(170, 244, 255, 0.35);
+  background: rgba(2, 16, 28, 0.94);
+  color: #ddfbff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
   opacity: 0;
-  animation: waveFillIn 800ms ease forwards;
+  transition: opacity 120ms ease;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  z-index: 2;
 }
 
-.wave-line {
-  fill: none;
-  stroke: #8ef4ff;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 9px rgba(77, 226, 255, 0.45));
-  stroke-dasharray: 1800;
-  stroke-dashoffset: 1800;
-  animation: drawWave 1s ease forwards;
-}
-
-.wave-point {
-  stroke-width: 2;
-  opacity: 0;
-  transform-origin: center;
-  animation: popIn 460ms ease forwards;
-}
-
-.wave-point.high {
-  fill: #ffca8f;
-  stroke: #8e5b1a;
-}
-
-.wave-point.low {
-  fill: #8ff8e8;
-  stroke: #14706f;
+.curve-tooltip.visible {
+  opacity: 1;
 }
 
 .station-map {
