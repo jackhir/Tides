@@ -1,5 +1,6 @@
 const NOAA_STATIONS_URL =
   "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions";
+const NOAA_ALERTS_URL = "https://api.weather.gov/alerts/active";
 
 const SANTA_MONICA = {
   name: "Santa Monica, CA",
@@ -32,6 +33,9 @@ const stationName = document.getElementById("stationName");
 const timeline = document.getElementById("timeline");
 const curve = document.getElementById("curve");
 const forecast = document.getElementById("forecast");
+const noaaEventCount = document.getElementById("noaaEventCount");
+const noaaEventStatus = document.getElementById("noaaEventStatus");
+const noaaEvents = document.getElementById("noaaEvents");
 
 let stations = [];
 let stationMap = null;
@@ -320,6 +324,103 @@ function toFriendlyDay(ymd) {
   });
 }
 
+function toLocalDateTime(dateLike) {
+  if (!dateLike) {
+    return "Unknown";
+  }
+
+  const parsed = new Date(dateLike);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Unknown";
+  }
+
+  return parsed.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function truncateText(input, limit = 220) {
+  const text = String(input ?? "").trim();
+  if (!text) {
+    return "";
+  }
+
+  if (text.length <= limit) {
+    return text;
+  }
+
+  return `${text.slice(0, limit - 3).trimEnd()}...`;
+}
+
+function severityClassName(severity) {
+  const token = String(severity ?? "").trim().toLowerCase();
+
+  if (token === "extreme" || token === "severe" || token === "moderate" || token === "minor") {
+    return token;
+  }
+
+  return "unknown";
+}
+
+function severityRank(severity) {
+  const map = {
+    extreme: 0,
+    severe: 1,
+    moderate: 2,
+    minor: 3,
+    unknown: 4
+  };
+
+  return map[severityClassName(severity)] ?? 4;
+}
+
+function urgencyRank(urgency) {
+  const map = {
+    immediate: 0,
+    expected: 1,
+    future: 2,
+    past: 3
+  };
+
+  return map[String(urgency ?? "").trim().toLowerCase()] ?? 4;
+}
+
+function normalizeNoaaAlert(feature) {
+  const properties = feature?.properties ?? {};
+  const event = String(properties.event ?? "Weather Alert").trim() || "Weather Alert";
+  const severity = String(properties.severity ?? "Unknown").trim() || "Unknown";
+  const urgency = String(properties.urgency ?? "Unknown").trim() || "Unknown";
+  const area = String(properties.areaDesc ?? "Local area").trim() || "Local area";
+  const headline = String(properties.headline ?? "").trim();
+  const description = String(properties.description ?? "").trim();
+  const instruction = String(properties.instruction ?? "").trim();
+  const effective = properties.effective ?? properties.onset ?? null;
+  const expires = properties.expires ?? properties.ends ?? null;
+  const web = String(properties.web ?? "").trim();
+
+  const rawId = String(feature?.id ?? "").trim();
+  const fallbackId = `${event}-${effective ?? ""}-${expires ?? ""}-${area}`;
+  const id = rawId || fallbackId;
+
+  return {
+    id,
+    event,
+    severity,
+    urgency,
+    area,
+    headline,
+    description,
+    instruction,
+    effective,
+    expires,
+    web
+  };
+}
+
 function clearStatus() {
   statusEl.textContent = "";
   statusEl.className = "status";
@@ -362,6 +463,30 @@ async function fetchTides() {
   setStatus("Fetching a 5-day tide window from NOAA...");
   setLoading(true);
 
+  try {
+    const station = stations.find((entry) => entry.id === stationId);
+
+    const [events, noaaAlerts] = await Promise.all([
+      fetchTideEvents(stationId, pickedDate),
+      fetchNoaaAlertsForStation(station)
+    ]);
+
+    render(events, stationId, pickedDate, noaaAlerts);
+
+    if (noaaAlerts.warning) {
+      setStatus("Fresh tides loaded. NOAA weather alerts were unavailable for this request.", "ok");
+    } else {
+      setStatus("Fresh 5-day tides loaded.", "ok");
+    }
+  } catch (error) {
+    setStatus(`Could not load tides: ${error.message}`, "error");
+    renderEmpty();
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function fetchTideEvents(stationId, pickedDate) {
   const beginDate = formatDateYmd(pickedDate);
   const endDate = formatDateYmd(addDaysYmd(pickedDate, 4));
   const url = new URL("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter");
@@ -376,39 +501,94 @@ async function fetchTides() {
   url.searchParams.set("units", "english");
   url.searchParams.set("format", "json");
 
+  const response = await fetch(url, { mode: "cors" });
+  const payload = await response.json();
+
+  if (!response.ok || payload.error) {
+    const msg = payload?.error?.message || "Failed to fetch predictions.";
+    throw new Error(msg);
+  }
+
+  const events = (payload.predictions || [])
+    .map((item) => ({
+      datetime: item.t,
+      height: Number(item.v),
+      type: item.type,
+      dayKey: item.t.slice(0, 10)
+    }))
+    .filter((item) => Number.isFinite(item.height));
+
+  if (!events.length) {
+    throw new Error("No tide events were returned for this station in the selected range.");
+  }
+
+  return events;
+}
+
+async function fetchNoaaAlertsForStation(station) {
+  if (!station || !Number.isFinite(station.lat) || !Number.isFinite(station.lng)) {
+    return {
+      alerts: [],
+      warning: "Station coordinates were unavailable for NOAA alert lookup."
+    };
+  }
+
+  const url = new URL(NOAA_ALERTS_URL);
+  url.searchParams.set("point", `${station.lat},${station.lng}`);
+  url.searchParams.set("status", "actual");
+  url.searchParams.set("message_type", "alert");
+
   try {
-    const response = await fetch(url, { mode: "cors" });
+    const response = await fetch(url, {
+      mode: "cors",
+      headers: {
+        Accept: "application/geo+json"
+      }
+    });
+
     const payload = await response.json();
 
-    if (!response.ok || payload.error) {
-      const msg = payload?.error?.message || "Failed to fetch predictions.";
-      throw new Error(msg);
+    if (!response.ok) {
+      const message = payload?.detail || payload?.title || "NOAA alert feed did not respond cleanly.";
+      throw new Error(message);
     }
 
-    const events = (payload.predictions || [])
-      .map((item) => ({
-        datetime: item.t,
-        height: Number(item.v),
-        type: item.type,
-        dayKey: item.t.slice(0, 10)
-      }))
-      .filter((item) => Number.isFinite(item.height));
+    const unique = new Map();
+    (payload?.features || [])
+      .map((feature) => normalizeNoaaAlert(feature))
+      .forEach((alert) => {
+        unique.set(alert.id, alert);
+      });
 
-    if (!events.length) {
-      throw new Error("No tide events were returned for this station in the selected range.");
-    }
+    const alerts = [...unique.values()]
+      .sort((a, b) => {
+        const severityDiff = severityRank(a.severity) - severityRank(b.severity);
+        if (severityDiff !== 0) {
+          return severityDiff;
+        }
 
-    render(events, stationId, pickedDate);
-    setStatus("Fresh 5-day tides loaded.", "ok");
+        const urgencyDiff = urgencyRank(a.urgency) - urgencyRank(b.urgency);
+        if (urgencyDiff !== 0) {
+          return urgencyDiff;
+        }
+
+        return String(a.event).localeCompare(String(b.event));
+      })
+      .slice(0, 8);
+
+    return {
+      alerts,
+      warning: ""
+    };
   } catch (error) {
-    setStatus(`Could not load tides: ${error.message}`, "error");
-    renderEmpty();
-  } finally {
-    setLoading(false);
+    return {
+      alerts: [],
+      warning: error?.message || "Could not load NOAA weather alerts."
+    };
   }
 }
 
-function render(events, stationId, pickedDate) {
+function render(events, stationId, pickedDate, noaaAlerts = { alerts: [], warning: "" }) {
   const focusDayEvents = events.filter((event) => event.dayKey === pickedDate);
   const activeEvents = focusDayEvents.length ? focusDayEvents : events;
 
@@ -440,6 +620,7 @@ function render(events, stationId, pickedDate) {
   renderTimeline(activeEvents);
   renderCurve(activeEvents);
   renderForecast(events, pickedDate);
+  renderNoaaEvents(noaaAlerts.alerts, noaaAlerts.warning);
 }
 
 function renderTimeline(events) {
@@ -754,6 +935,77 @@ function renderForecast(events, pickedDate) {
   }
 }
 
+function renderNoaaEvents(alerts = [], warning = "") {
+  noaaEvents.innerHTML = "";
+  noaaEventCount.textContent = `${alerts.length} Active`;
+
+  if (warning) {
+    noaaEventStatus.textContent = `NOAA weather alerts warning: ${warning}`;
+    noaaEventStatus.className = "small alert-status error";
+
+    const fallback = document.createElement("p");
+    fallback.className = "small";
+    fallback.textContent = "Active alerts could not be loaded for this station right now.";
+    noaaEvents.appendChild(fallback);
+    return;
+  }
+
+  if (!alerts.length) {
+    noaaEventStatus.textContent = "No active NOAA weather alerts near this station right now.";
+    noaaEventStatus.className = "small alert-status ok";
+
+    const empty = document.createElement("p");
+    empty.className = "small";
+    empty.textContent = "Forecast is currently clear of active NOAA weather alerts at this location.";
+    noaaEvents.appendChild(empty);
+    return;
+  }
+
+  noaaEventStatus.textContent = `${alerts.length} active NOAA weather alert${
+    alerts.length === 1 ? "" : "s"
+  } near this station.`;
+  noaaEventStatus.className = "small alert-status";
+
+  alerts.forEach((alert, index) => {
+    const item = document.createElement("article");
+    item.className = "alert-item";
+    item.style.animationDelay = `${index * 65}ms`;
+
+    const summary =
+      truncateText(alert.headline, 180) ||
+      truncateText(alert.description, 180) ||
+      "NOAA posted an active weather alert for this area.";
+    const detail = truncateText(alert.instruction || alert.description, 220);
+
+    item.innerHTML = `
+      <div class="alert-top">
+        <p class="alert-event">${escapeHtml(alert.event)}</p>
+        <span class="alert-chip ${severityClassName(alert.severity)}">${escapeHtml(
+          alert.severity
+        )}</span>
+      </div>
+      <p class="alert-headline">${escapeHtml(summary)}</p>
+      <p class="alert-meta">${escapeHtml(alert.area)} · ${escapeHtml(alert.urgency)} urgency</p>
+      <p class="alert-time">Effective ${escapeHtml(toLocalDateTime(alert.effective))} · Expires ${escapeHtml(
+        toLocalDateTime(alert.expires)
+      )}</p>
+      <p class="alert-description">${escapeHtml(detail)}</p>
+    `;
+
+    if (alert.web && /^https?:\/\//i.test(alert.web)) {
+      const link = document.createElement("a");
+      link.className = "alert-link";
+      link.href = alert.web;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Open NOAA bulletin";
+      item.appendChild(link);
+    }
+
+    noaaEvents.appendChild(item);
+  });
+}
+
 function renderEmpty() {
   nextTideLabel.textContent = "-";
   nextTideTime.textContent = "No data loaded.";
@@ -764,6 +1016,10 @@ function renderEmpty() {
   timeline.innerHTML = "";
   curve.innerHTML = "";
   forecast.innerHTML = "";
+  noaaEventCount.textContent = "0 Active";
+  noaaEventStatus.textContent = "Pick a station to check active NOAA weather alerts.";
+  noaaEventStatus.className = "small alert-status";
+  noaaEvents.innerHTML = "";
 }
 
 function initEventHandlers() {

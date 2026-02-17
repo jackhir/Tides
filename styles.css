@@ -249,6 +249,29 @@ button:active {
   text-transform: uppercase;
 }
 
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.alert-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #062538;
+  background: linear-gradient(120deg, #a5f8ff, #79ffe0);
+}
+
 .next-tide {
   display: grid;
   align-content: start;
@@ -526,6 +549,112 @@ button:active {
   font-size: 0.85rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.alert-status {
+  margin-top: 0.7rem;
+}
+
+.alert-status.ok {
+  color: #9ff0d2;
+}
+
+.alert-status.error {
+  color: #ffb1b1;
+}
+
+.alerts-list {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.alert-item {
+  background: rgba(2, 11, 19, 0.72);
+  border: 1px solid rgba(150, 221, 252, 0.18);
+  border-radius: 12px;
+  padding: 0.72rem;
+  animation: fadeInUp 320ms ease both;
+}
+
+.alert-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.alert-event {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ecfeff;
+}
+
+.alert-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.alert-chip.extreme {
+  color: #ffd8d8;
+  background: rgba(170, 22, 22, 0.36);
+  border-color: rgba(255, 151, 151, 0.38);
+}
+
+.alert-chip.severe {
+  color: #ffe0be;
+  background: rgba(183, 71, 0, 0.36);
+  border-color: rgba(255, 192, 134, 0.38);
+}
+
+.alert-chip.moderate {
+  color: #ffebbf;
+  background: rgba(168, 116, 0, 0.32);
+  border-color: rgba(255, 213, 136, 0.36);
+}
+
+.alert-chip.minor {
+  color: #dcffe5;
+  background: rgba(16, 122, 56, 0.28);
+  border-color: rgba(130, 255, 183, 0.32);
+}
+
+.alert-chip.unknown {
+  color: #d8f4ff;
+  background: rgba(56, 111, 147, 0.28);
+  border-color: rgba(167, 231, 255, 0.28);
+}
+
+.alert-headline {
+  margin: 0.5rem 0 0;
+  color: #dff8ff;
+  line-height: 1.4;
+}
+
+.alert-meta,
+.alert-time,
+.alert-description {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.alert-link {
+  margin-top: 0.55rem;
+  display: inline-flex;
+  color: #9fe9ff;
+  text-underline-offset: 2px;
+  font-size: 0.84rem;
 }
 
 .timeline {
